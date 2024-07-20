@@ -8,6 +8,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+stormUiHost = os.getenv("STORM_UI_HOST")
+httpPort = int(os.getenv("PORT_EXPOSE"))
+refreshRate = int(os.getenv("REFRESH_RATE"))
+
 # TOPOLOGY/SUMMARY METRICS
 STORM_TOPOLOGY_UPTIME_SECONDS = Gauge(
     "uptime_seconds",
@@ -284,10 +288,6 @@ def topologySummaryMetric(topology_summary, stormUiHost):
         print(e)
         sys.exit(1)
 
-
-stormUiHost = os.getenv("STORM_UI_HOST")
-httpPort = int(os.getenv("PORT_EXPOSE"))
-refreshRate = int(os.getenv("REFRESH_RATE"))
 
 start_http_server(httpPort)
 while True:
