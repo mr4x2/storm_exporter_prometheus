@@ -181,6 +181,28 @@ STORM_TOPOLOGY_BOLTS_EMITTED = Gauge(
     ["TopologyName", "TopologyId", "BoltId"],
 )
 
+# CLUSTER METRICS
+STORM_CLUSTER_WORKERS_TOTAL = Gauge(
+    "worker_cluster_total",
+    "number worker process total in cluster",
+    ["ClusterHost"],
+)
+
+
+STORM_CLUSTER_WORKERS_USED = Gauge(
+    "worker_cluster_used",
+    "number worker process have used in cluster",
+    ["ClusterHost"],
+)
+
+SUPERVISOR_CLUSTER_TOTAL = Gauge(
+    "supervisor_cluster_total",
+    "number supervisors of cluster",
+    ["ClusterHost"],
+)
+
+
+
 
 def getMetric(metric):
     if metric is None:
@@ -236,6 +258,11 @@ def boltMetric(bolt, tn, tid):
     STORM_TOPOLOGY_BOLTS_FAILED.labels(tn, tid, bid).set(getMetric(bolt["failed"]))
     STORM_TOPOLOGY_BOLTS_EMITTED.labels(tn, tid, bid).set(getMetric(bolt["emitted"]))
 
+def clusterMetric(cluster_metrics, cluster_hostname):
+    STORM_CLUSTER_WORKERS_TOTAL.labels(cluster_hostname).set(getMetric(cluster_metrics["slotsTotal"]))
+    STORM_CLUSTER_WORKERS_USED.labels(cluster_hostname).set(getMetric(cluster_metrics["slotsUsed"]))
+    SUPERVISOR_CLUSTER_TOTAL.labels(cluster_hostname).set(getMetric(cluster_metrics["supervisors"]))
+
 
 def topologyMetric(topology):
     tn = topology["name"]
@@ -284,6 +311,9 @@ def topologySummaryMetric(topology_summary, stormUiHost):
     try:
         r = requests.get("http://" + stormUiHost + "/api/v1/topology/" + tid)
         topologyMetric(r.json())
+
+        request_cluster_metrics = requests.get(("http://" + stormUiHost + "/api/v1/cluster/summary"))
+        clusterMetric(request_cluster_metrics.json(), stormUiHost)
     except requests.exceptions.RequestException as e:
         print(e)
         sys.exit(1)
