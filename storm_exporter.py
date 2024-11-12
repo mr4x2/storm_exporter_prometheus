@@ -311,9 +311,6 @@ def topologySummaryMetric(topology_summary, stormUiHost):
     try:
         r = requests.get("http://" + stormUiHost + "/api/v1/topology/" + tid)
         topologyMetric(r.json())
-
-        request_cluster_metrics = requests.get(("http://" + stormUiHost + "/api/v1/cluster/summary"))
-        clusterMetric(request_cluster_metrics.json(), stormUiHost)
     except requests.exceptions.RequestException as e:
         print(e)
         sys.exit(1)
@@ -322,10 +319,14 @@ def topologySummaryMetric(topology_summary, stormUiHost):
 start_http_server(httpPort)
 while True:
     try:
+        request_cluster_metrics = requests.get(("http://" + stormUiHost + "/api/v1/cluster/summary"))
+        clusterMetric(request_cluster_metrics.json(), stormUiHost)
+
         r = requests.get("http://" + stormUiHost + "/api/v1/topology/summary")
         print("caught metrics")
         for topology in r.json()["topologies"]:
             topologySummaryMetric(topology, stormUiHost)
+            
     except requests.exceptions.RequestException as e:
         print(e)
         sys.exit(1)
