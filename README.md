@@ -11,7 +11,7 @@ cp sample.env .env
 
 Build image
 ```commandline
-docker build -t mr4x2/stormexporter:v1.2 . 
+docker build -t mr4x2/stormexporter:v1.2.2 . 
 ```
 
 Run container with env
@@ -22,5 +22,5 @@ docker run -d -p 8082:8082 --env-file .env --name stormexporter stormexporter
 Or if you dont want to build dokcer image
 
 ```commandline
-docker run -d -p 8082:8082 --env-file .env --name stormexporter mr4x2/stormexporter:v1.2
+docker run -d -p 8082:8082 --env-file .env --name stormexporter mr4x2/stormexporter:v1.2.2
 ```

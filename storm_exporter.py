@@ -309,7 +309,7 @@ def topologySummaryMetric(topology_summary, stormUiHost):
     STORM_TOPOLOGY_ASSIGNED_CPU.labels(tn, tid).set(topology_summary["assignedCpu"])
 
     try:
-        r = requests.get("http://" + stormUiHost + "/api/v1/topology/" + tid)
+        r = requests.get("http://" + stormUiHost + "/api/v1/topology/" + tid+"?window=600")
         topologyMetric(r.json())
     except requests.exceptions.RequestException as e:
         print(e)
