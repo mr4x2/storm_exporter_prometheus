@@ -3,6 +3,7 @@ import os
 import time
 import sys
 import requests
+import re
 from prometheus_client import start_http_server, Gauge
 from dotenv import load_dotenv
 
@@ -201,6 +202,11 @@ SUPERVISOR_CLUSTER_TOTAL = Gauge(
     ["ClusterHost"],
 )
 
+WEIGHT_SCALE = Gauge(
+    "weight_scale",
+    "Metric used to determine scaling in KEDA based on worker_process_used/worker_process_total, spouts_complete_latency, bolts_capacity",
+    ["ClusterHost"],
+)
 
 
 
@@ -242,10 +248,10 @@ def spoutMetric(spout, tn, tid):
 def boltMetric(bolt, tn, tid):
     bid = bolt["boltId"]
     STORM_TOPOLOGY_BOLTS_CAPACITY.labels(tn, tid, bid).set(
-        getMetric(bolt["processLatency"])
+        getMetric(bolt["capacity"])        
     )
     STORM_TOPOLOGY_BOLTS_PROCESS_LATENCY.labels(tn, tid, bid).set(
-        getMetric(bolt["capacity"])
+        getMetric(bolt["processLatency"])
     )
     STORM_TOPOLOGY_BOLTS_EXECUTE_LATENCY.labels(tn, tid, bid).set(
         getMetric(bolt["executeLatency"])
@@ -315,6 +321,32 @@ def topologySummaryMetric(topology_summary, stormUiHost):
         print(e)
         sys.exit(1)
 
+def weight_scale_metric(cluster_metrics, cluster_hostname, topology_summary=None):
+    ratio_worker_process = float(getMetric(cluster_metrics["slotsUsed"]))/float(getMetric(cluster_metrics["slotsTotal"]))
+    
+    tid = topology_summary["id"]
+    r = requests.get("http://" + stormUiHost + "/api/v1/topology/" + tid+"?window=600")
+    topology_metric = r.json()
+    bolt_capacity_values = []
+    spout_latency_values = []
+    for bolt in topology_metric["bolts"]:
+        if re.match(r"^split-.*", bolt["boltId"]):
+            bolt_capacity_values.append(float(bolt["capacity"]))
+    for spout in topology_metric["spouts"]:
+        if spout["spoutId"] == "spout-data-iot-data":
+            spout_latency_values.append(float(spout["completeLatency"])) 
+    avg_bolt_capacity = sum(bolt_capacity_values) / len(bolt_capacity_values) if bolt_capacity_values else 0
+    avg_spout_complete = sum(spout_latency_values) / len(spout_latency_values) if spout_latency_values else 0
+    weight_scale_cal = ratio_worker_process * 0.6/0.7 + (avg_bolt_capacity/0.5)*0.2 + (avg_spout_complete/100)*0.2
+    WEIGHT_SCALE.labels(cluster_hostname).set(weight_scale_cal)
+    print(getMetric(cluster_metrics["slotsUsed"]),getMetric(cluster_metrics["slotsTotal"]))
+    print(ratio_worker_process * 0.6/0.7)
+    print(avg_bolt_capacity)
+    print(avg_spout_complete)
+    print(weight_scale_cal)
+    
+
+    return ratio_worker_process
 
 start_http_server(httpPort)
 while True:
@@ -326,6 +358,7 @@ while True:
         print("caught metrics")
         for topology in r.json()["topologies"]:
             topologySummaryMetric(topology, stormUiHost)
+            weight_scale_metric(request_cluster_metrics.json(), stormUiHost, topology)
             
     except requests.exceptions.RequestException as e:
         print(e)
