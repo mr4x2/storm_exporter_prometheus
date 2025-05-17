@@ -4,10 +4,15 @@ import time
 import sys
 import requests
 import re
+import logging
 from prometheus_client import start_http_server, Gauge
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("storm_exporter")
 
 stormUiHost = os.getenv("STORM_UI_HOST")
 httpPort = int(os.getenv("PORT_EXPOSE"))
@@ -339,13 +344,6 @@ def weight_scale_metric(cluster_metrics, cluster_hostname, topology_summary=None
     avg_spout_complete = sum(spout_latency_values) / len(spout_latency_values) if spout_latency_values else 0
     weight_scale_cal = ratio_worker_process * 0.6/0.7 + (avg_bolt_capacity/0.5)*0.2 + (avg_spout_complete/100)*0.2
     WEIGHT_SCALE.labels(cluster_hostname).set(weight_scale_cal)
-    print(getMetric(cluster_metrics["slotsUsed"]),getMetric(cluster_metrics["slotsTotal"]))
-    print(ratio_worker_process * 0.6/0.7)
-    print(avg_bolt_capacity)
-    print(avg_spout_complete)
-    print(weight_scale_cal)
-    
-
     return ratio_worker_process
 
 start_http_server(httpPort)
@@ -355,12 +353,12 @@ while True:
         clusterMetric(request_cluster_metrics.json(), stormUiHost)
 
         r = requests.get("http://" + stormUiHost + "/api/v1/topology/summary")
-        print("caught metrics")
+        logger.info("caught metrics from %s",str(r.json()))
         for topology in r.json()["topologies"]:
             topologySummaryMetric(topology, stormUiHost)
             weight_scale_metric(request_cluster_metrics.json(), stormUiHost, topology)
             
     except requests.exceptions.RequestException as e:
-        print(e)
+        logger.error(e)
         sys.exit(1)
     time.sleep(refreshRate)
